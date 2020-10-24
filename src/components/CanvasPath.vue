@@ -1,5 +1,5 @@
 <template>
-    <v-layer>
+    <v-layer ref="layer">
         <v-rect 
             v-if="data.type === 'rect'" 
             :config="data" 
@@ -10,12 +10,16 @@
             :config="data" 
             @transformend="handleTransformEnd" 
         />
+        <v-image
+            v-else-if="data.type === 'image'" 
+            :config="data" 
+            @transformend="handleTransformEnd"  
+        />
         <v-transformer ref="transformer" />
     </v-layer>
 </template>
 
 <script>
-import Konva from 'konva'
 import { mapState } from 'vuex'
 
 export default {
@@ -31,28 +35,33 @@ export default {
     watch: {
         selectedShape(newVal, oldVal) {
             if (newVal !== oldVal) {
-                if (newVal === this.data.name) {
-                    return this.updateTransformer()
-                } else {
-                    return this.removeTransformer()
-                }
+                newVal === this.data.name
+                    ? this.updateTransformer()
+                    : this.removeTransformer()
+            }
+        }
+    },
+    mounted() {
+        if (this.data.type === 'image') {
+            const image = new Image()                        
+            
+            image.src = this.data.imageSrc
+            image.onload = () => {
+                this.data.image = image                
             }
         }
     },
     methods: {
         handleTransformEnd(e) {
-            // update the state
+            // sincronizando mudanças
             this.data.x = e.target.x();
             this.data.y = e.target.y();
             this.data.rotation = e.target.rotation();
             this.data.scaleX = e.target.scaleX();
             this.data.scaleY = e.target.scaleY();
-
-            // change fill
-            this.data.fill = Konva.Util.getRandomColor();
         },
         updateTransformer() {
-            // here we need to manually attach or detach Transformer node
+            // ativando transformer
             const transformer = this.$refs.transformer
             const transformerNode = transformer.getNode()
             const stage = transformerNode.getStage()
@@ -60,18 +69,18 @@ export default {
 
             const selectedNode = stage.findOne('.' + selectedShape)
             
-            // do nothing if selected node is already attached
             if (selectedNode === transformerNode.node()) {
                 return
             }
 
             if (selectedNode) {
-                // attach to another node
+                // adicionado ao transformer layer
                 transformerNode.nodes([selectedNode])
             } else {
-                // remove transformer
                 this.removeTransformer()
             }
+
+            // aplicando no canvas transformer
             transformerNode.getLayer().batchDraw()
         },
         removeTransformer() {
