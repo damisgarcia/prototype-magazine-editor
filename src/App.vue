@@ -7,7 +7,11 @@
                 @mousedown="handleStageMouseDown"
                 @touchstart="handleStageMouseDown"
             >
-
+                <v-layer>
+                    <v-image
+                        :config="{id: 'background', image: background}" 
+                    />
+                </v-layer>
                 <CanvasPath 
                     v-for="path in paths" 
                     :key="path.name" 
@@ -19,6 +23,7 @@
         <div class="tools">
             <h1>Protótipo criador de quadrinho</h1>
             <div class="elements">
+                <h3>Objetos</h3>
                 <div class="elements-search">
                     <input placeholder="Buscar imagem" v-model="query" />
                 </div>
@@ -27,10 +32,21 @@
                         <img :src="element.imageSrc" :title="element.title" />
                     </div>
                 </div>
+                <button v-if="selectedShape" @click="removeElement">
+                    Apagar Elemento
+                </button>
             </div>
-            <button v-if="selectedShape" @click="removeElement">
-                Apagar Elemento
-            </button>
+            <div class="backgrounds">
+                <h3>Fundos</h3>
+                <div class="elements-search">
+                    <input placeholder="Buscar por fundo" v-model="backgroundQuery" />
+                </div>
+                <div class="elements-list">
+                    <div class="element" v-for="bg in filteredBackgrounds" :key="bg.title" @click.stop="() => addBackground(bg)">
+                        <img :src="bg.src" :title="bg.title" />
+                    </div>
+                </div>
+            </div>            
         </div>
     </div>
 </template>
@@ -52,6 +68,22 @@ export default {
         height: window.innerHeight / 2
       },
       query: '',
+      background: null,
+      backgrounds: [
+          {
+              title: 'Montanha',
+              src: require('./assets/bgs/01.webp'),
+          },
+          {
+              title: 'Praia',
+              src: require('./assets/bgs/02.webp'),
+          },
+          {
+              title: 'Verão',
+              src: require('./assets/bgs/03.webp'),
+          }
+      ],
+      backgroundQuery: '',
       elements: [
           {
             title: 'Bola',
@@ -85,6 +117,20 @@ export default {
             y: 24,
             rotation: 0,
             draggable: true
+          },
+          {
+            title: 'Balloon',
+            name: 'image-4',
+            type: 'image',
+            variant: 'balloon',
+            text: 'Insira seu texto aqui lorema sadsda',
+            image: null,
+            imageSrc: require('./assets/ballons/balloon.png'),
+            width: 125,
+            height: 100,
+            draggable: true,
+            fontSize: 14,
+            padding: 8,
           }
       ],
       paths: [          
@@ -98,6 +144,12 @@ export default {
             return ele.title.toLowerCase().includes(query)
         })
     },
+    filteredBackgrounds() {
+        return this.backgrounds.filter((ele) => {
+            const query = this.backgroundQuery.toLowerCase()
+            return ele.title.toLowerCase().includes(query)
+        })
+    },
     ...mapState({
         'selectedShape': ({ selectedShape }) => selectedShape
     })
@@ -106,20 +158,32 @@ export default {
     addElement(element) {
         this.paths.push({ ...element, name: uuidv4() })
     },
+    addBackground(background){
+        const image = new Image()
+        
+        image.onload = () => {
+            this.background = image
+        }
+
+        image.src = background.src
+    },
     removeElement() {
         const pathIndex = this.paths.findIndex((path) => path.name === this.selectedShape)
         this.paths.splice(pathIndex, 1)
         this.selectShape(null)
     },
-    handleStageMouseDown(e) {
+    handleStageMouseDown({ target }) {        
+        const stage = target.getStage()
+        const group = target.parent?.nodeType === 'Group' ? target.parent : null
+
         // clicked on stage - clear selection
-        if (e.target.nodeType === e.target.getStage().nodeType) {
+        if (target.nodeType === stage.nodeType || target.attrs.id === 'background') {
             this.selectShape(null)
             return
         }
 
         // find clicked rect by its name
-        const name = e.target.name()
+        const name = group?.name() || target.name()
         const path = this.paths.find((r) => r.name === name)
 
         if (path) {
@@ -137,7 +201,7 @@ export default {
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     h1 {
         font-size: 24px;
         font-weight: bold;
@@ -149,12 +213,15 @@ export default {
         padding: 1rem 1.5rem;
     }
     .elements {
+        margin-bottom: 3rem;
         &-list {
             display: flex;
             flex-direction: row;
             align-items: flex-start;
+            flex-wrap: wrap;
             .element {
                 padding: 1rem;
+                max-width: 25%;
                 &:not(:last-child) {
                     margin-right: 2rem;
                 }

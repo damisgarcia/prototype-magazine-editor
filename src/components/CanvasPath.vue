@@ -1,19 +1,31 @@
 <template>
     <v-layer ref="layer">
-        <v-rect 
-            v-if="data.type === 'rect'" 
-            :config="data" 
-            @transformend="handleTransformEnd" 
-        />
-        <v-circle 
-            v-else-if="data.type === 'circle'" 
-            :config="data" 
-            @transformend="handleTransformEnd" 
-        />
-        <v-image
-            v-else-if="data.type === 'image'" 
-            :config="data" 
-            @transformend="handleTransformEnd"  
+        <v-group 
+            v-if="data.variant === 'balloon'" 
+            ref='group'
+            :config="{ name: data.name, draggable: true }"
+            @transformed="handleTransformEnd" 
+        >
+            <v-image :config="{
+                image: data.image,
+                width: data.width,
+                height: data.height,
+            }"></v-image>
+            <v-text ref="text" :config="{
+                width: data.width,
+                height: data.height,
+                fontSize: data.fontSize,
+                align: 'center',
+                verticalAlign: 'middle',                
+                padding: data.padding,
+                wrap: 'word',
+                text: data.text
+            }"
+            @dblclick="handleDoubleTap"></v-text>      
+        </v-group>
+        <v-image v-else 
+            :config="data"
+            @transformed="handleTransformEnd" 
         />
         <v-transformer ref="transformer" />
     </v-layer>
@@ -52,6 +64,40 @@ export default {
         }
     },
     methods: {
+        createTextarea() {
+            // Clear Selection
+            this.removeTransformer()
+
+            const groupNode = this.$refs.group.getNode()
+            const textNode = this.$refs.text.getNode()
+            const textPosition = textNode.getAbsolutePosition()
+
+            const areaPosition = {
+                x: textPosition.x,
+                y: textPosition.y,
+            }
+            const absTextNodeScale = textNode.getAbsoluteScale()
+            
+            const textarea = document.createElement('textarea')
+
+            document.body.appendChild(textarea)
+
+            textarea.value = textNode.text()
+            textarea.style.position = 'absolute'
+            textarea.style.top = areaPosition.y + 'px'
+            textarea.style.left = areaPosition.x + 'px'
+            textarea.style.fontSize = textNode.fontSize() * absTextNodeScale.x + 'px'
+            textarea.style.width = textNode.width() * groupNode.scaleX() + 'px'
+            textarea.style.height = textNode.height() * groupNode.scaleY() + 'px'
+            textarea.style.verticalAlign = 'middle'
+
+            textarea.focus()
+
+            textarea.addEventListener('blur', ({ target }) => {
+                this.data.text = target.value
+                document.body.removeChild(textarea)
+            })
+        },
         handleTransformEnd(e) {
             // sincronizando mudanças
             this.data.x = e.target.x();
@@ -59,6 +105,11 @@ export default {
             this.data.rotation = e.target.rotation();
             this.data.scaleX = e.target.scaleX();
             this.data.scaleY = e.target.scaleY();
+        },
+        handleDoubleTap() {
+            if (this.data.variant === 'balloon') {
+                this.createTextarea()
+            }
         },
         updateTransformer() {
             // ativando transformer
@@ -68,7 +119,7 @@ export default {
             const { selectedShape } = this
 
             const selectedNode = stage.findOne('.' + selectedShape)
-            
+
             if (selectedNode === transformerNode.node()) {
                 return
             }
