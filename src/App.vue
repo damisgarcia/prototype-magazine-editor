@@ -1,26 +1,40 @@
 <template>
     <div id="main">
-        <div class="canvas">
-            <v-stage 
-                ref="stage" 
-                :config="configKonva" 
-                @mousedown="handleStageMouseDown"
-                @touchstart="handleStageMouseDown"
-            >
-                <v-layer>
-                    <v-image
-                        :config="{id: 'background', image: background}" 
+        <div class="pages">
+            <div class="canvas" v-if="page">
+                <v-stage 
+                    ref="stage" 
+                    :config="configKonva" 
+                    @mousedown="handleStageMouseDown"
+                    @touchstart="handleStageMouseDown"
+                >
+                    <v-layer>
+                        <v-image
+                            :config="{id: 'background', image: page.background}" 
+                        />
+                    </v-layer>
+                    <CanvasPath 
+                        v-for="path in page.paths" 
+                        :key="path.name" 
+                        :id="path.name" 
+                        :data="path"
+                        @change="onChangeElement"
                     />
-                </v-layer>
-                <CanvasPath 
-                    v-for="path in paths" 
-                    :key="path.name" 
-                    :id="path.name" 
-                    :data="path" 
-                />
-            </v-stage>
+                </v-stage>
+            </div>
         </div>
         <div class="tools">
+            <div class="buttons">
+                <div class="button-group">
+                    <button @click="newPage">Criar Página</button>
+                    <button @click="removePage">Remover Página Atual</button>
+
+                </div>
+                <div class="button-group">
+                    <button @click="nextPage">Próxima Página</button>
+                    <button @click="prevPage">Voltar Página</button>
+                </div>
+            </div>
             <h1>Protótipo criador de quadrinho</h1>
             <div class="elements">
                 <h3>Objetos</h3>
@@ -132,12 +146,13 @@ export default {
             fontSize: 14,
             padding: 8,
           }
-      ],
-      paths: [          
-      ]
+      ],      
     }
   },
-  computed: {      
+  computed: {
+    page() {
+        return this.$store.getters.currentPage
+    },
     filteredElements() {
         return this.elements.filter((ele) => {
             const query = this.query.toLowerCase()
@@ -151,25 +166,29 @@ export default {
         })
     },
     ...mapState({
-        'selectedShape': ({ selectedShape }) => selectedShape
+        'pages': (state) => state.pages,
+        'selectedShape': (state) => state.selectedShape
     })
+  },
+  mounted() {
+      this.newPage()
   },
    methods: {
     addElement(element) {
-        this.paths.push({ ...element, name: uuidv4() })
+        this.page.paths.push({ ...element, name: uuidv4() })
     },
     addBackground(background){
         const image = new Image()
         
         image.onload = () => {
-            this.background = image
+            this.page.background = image
         }
 
         image.src = background.src
     },
     removeElement() {
-        const pathIndex = this.paths.findIndex((path) => path.name === this.selectedShape)
-        this.paths.splice(pathIndex, 1)
+        const pathIndex = this.page.paths.findIndex((path) => path.name === this.selectedShape)
+        this.page.paths.splice(pathIndex, 1)
         this.selectShape(null)
     },
     handleStageMouseDown({ target }) {        
@@ -184,13 +203,24 @@ export default {
 
         // find clicked rect by its name
         const name = group?.name() || target.name()
-        const path = this.paths.find((r) => r.name === name)
+        const path = this.page.paths.find((r) => r.name === name)
 
         if (path) {
             this.selectShape(name)
         }
     },
-    ...mapActions(['selectShape'])
+    onChangeElement() {
+        console.log(this.page)
+        this.updatePage(this.page)
+    },
+    ...mapActions([
+        'newPage',
+        'removePage',
+        'updatePage',
+        'nextPage',
+        'prevPage',
+        'selectShape'
+    ])
   }
 }
 </script>
@@ -206,7 +236,7 @@ export default {
         font-size: 24px;
         font-weight: bold;
     }
-    .canvas, .tools {
+    .pages, .tools {
         flex: 1;
     }
     .tools {
@@ -233,6 +263,15 @@ export default {
                 }
             }
         }
+    }
+    .buttons {
+        display: flex;
+        .button-group {
+            flex: 1;
+            button:not(:last-child) {
+                margin-right: 1rem;
+            }
+        }        
     }
 }
 </style>

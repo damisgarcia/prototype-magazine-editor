@@ -3,8 +3,15 @@
         <v-group 
             v-if="data.variant === 'balloon'" 
             ref='group'
-            :config="{ name: data.name, draggable: true }"
-            @transformed="handleTransformEnd" 
+            :config="{ 
+                name: data.name, 
+                x: data.x,
+                y: data.y,
+                scaleX: data.scaleX, 
+                scaleY: data.scaleY,
+                draggable: true 
+            }"
+            @dragend="handleTransformEnd"
         >
             <v-image :config="{
                 image: data.image,
@@ -25,9 +32,9 @@
         </v-group>
         <v-image v-else 
             :config="data"
-            @transformed="handleTransformEnd" 
+            @dragend="handleTransformEnd"
         />
-        <v-transformer ref="transformer" />
+        <v-transformer ref="transformer" @transform="handleTransformEnd" />
     </v-layer>
 </template>
 
@@ -42,7 +49,8 @@ export default {
         }
     },
     computed: mapState({
-        selectedShape: ({ selectedShape }) => selectedShape
+        currentPage: (state) => state.currentPage,
+        selectedShape: (state) => state.selectedShape
     }),
     watch: {
         selectedShape(newVal, oldVal) {
@@ -62,6 +70,9 @@ export default {
                 this.data.image = image                
             }
         }
+    },
+    destroyed() {
+        this.removeTransformer()
     },
     methods: {
         createTextarea() {
@@ -99,12 +110,23 @@ export default {
             })
         },
         handleTransformEnd(e) {
-            // sincronizando mudanças
-            this.data.x = e.target.x();
-            this.data.y = e.target.y();
-            this.data.rotation = e.target.rotation();
-            this.data.scaleX = e.target.scaleX();
-            this.data.scaleY = e.target.scaleY();
+            if (e.currentTarget.nodeType === 'Group'){
+                const groupNode = this.$refs.group?.getNode()
+                if (groupNode) {
+                    this.data.x = groupNode.x();
+                    this.data.y = groupNode.y();
+                    this.data.rotation = groupNode.rotation();
+                    this.data.scaleX = groupNode.scaleX();
+                    this.data.scaleY = groupNode.scaleY();
+                }
+            } else {
+                // sincronizando mudanças
+                this.data.x = e.target.x();
+                this.data.y = e.target.y();
+                this.data.rotation = e.target.rotation();
+                this.data.scaleX = e.target.scaleX();
+                this.data.scaleY = e.target.scaleY();
+            }
         },
         handleDoubleTap() {
             if (this.data.variant === 'balloon') {
@@ -133,6 +155,7 @@ export default {
 
             // aplicando no canvas transformer
             transformerNode.getLayer().batchDraw()
+            
         },
         removeTransformer() {
             const transformer = this.$refs.transformer
